@@ -1,27 +1,31 @@
-pipeline {
-    environment {
-    imagename = "ramisetty32/flask"
-    DOCKERHUB_CREDENTIALS=credentials('dockerhub')
-   
-  }
+node
+{
+	
+		
+	stage('Checkout')
+	{   
 
-   agent any
-   
-   stages {
-       stage('checkout') {
-            steps {
-                echo "this is checkout stage"
-                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/ramisetty1/k8s-code.git']]])
-            }
+        checkout([$class: 'GitSCM', 
+        branches: [[name: '*/master']],
+        extensions: [], userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/ramisetty1/k8s-code.git']]])
+		
+	}
+	
+	stage('dockerimage')
+    {
+        app = docker.build("ramisetty32/flask")
+    }
+	
+	stage('Push image') {
+        
+        docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {
+            app.push("${env.BUILD_NUMBER}")
         }
-      
-        stage('Docker Image Build'){
-                steps{
-                    script{
-                        docker.build imagename + ":$BUILD_NUMBER"
-                    }
-                }
-  
-}
-}
+    }
     
+    stage('Trigger ManifestUpdate') {
+                echo "triggering updatemanifestjob"
+                build job: 'updatemanifest', parameters: [string(name: 'DOCKERTAG', value: env.BUILD_NUMBER)]
+        }
+    
+}
